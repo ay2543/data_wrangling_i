@@ -1,6 +1,48 @@
 ---
-title: "Simple document"
+title: "Data import"
 output: github_document
 ---
+```{r, echo=F}
+library(tidyverse)
+```
+
+
 
 ## Data Import: CSVs
+
+Let's import data using the `readr` package.
+
+```{r}
+litters_df = read_csv("data/FAS_litters.csv")
+litters_df = janitor::clean_names((litters_df))
+```
+
+Look at the data
+
+```{r}
+litters_df
+head(litters_df) #first 6 rows
+tail (litters_df) # last 6 rows
+```
+
+```{r, eval=F}
+view(litters_df) #usually not in Rmd files as view opens a new window
+```
+
+```{r}
+skimr::skim(litters_df)
+```
+
+`read_csv` options
+
+```{r, eval=F}
+read_csv("data/FAS_litters.csv", na = c("", "NA", 999, 88), skip = 2) 
+#define NAs, how many rows you want to skip
+```
+
+## Other file formats
+
+
+
+
+
