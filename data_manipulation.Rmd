@@ -1,0 +1,14 @@
+---
+title: "data_manipulation"
+output: github_document
+date: "2022-09-22"
+---
+
+Once you've imported data, you're going to need to do some cleaning up.
+
+
+
+
+
+
+
