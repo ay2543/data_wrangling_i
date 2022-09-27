@@ -89,8 +89,7 @@ filter(pups_data, sex == 2, pd_walk < 11)
 You can use `drop_na()` within the function to remove missing variables
 
 ```{r}
-drop_na(litters_data) # remove any row with a missing value
-drop_na(litters_data, wt_increase) # remove rows for which wt_increase is missing.
+drop_na(litters_data, gd0_weight) # remove rows for which gd0_weight is missing.
 ```
 
 ## `mutate`
@@ -176,5 +175,11 @@ litters_data =
 
 ```
 
+You can use piping with a non tidyverse function:
+```{r}
+litters_data %>%
+  lm(wt_gain ~ pups_born_alive, data = .) %>%
+  broom::tidy()
+```
 
 

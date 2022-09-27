@@ -1,0 +1,197 @@
+---
+title: "Tidy Data"
+output: github_document
+date: "2022-09-27"
+---
+
+# `pivot_longer`
+
+## Setup
+Load packages and limit the number of rows to be displayed
+
+```{r, message=F}
+library(tidyverse)
+options(tibble.print_min = 5)
+```
+
+
+## Load data
+
+Data is a SAS file, need to use `haven` package.
+Then clean names to be all lower case with clean_names.
+```{r}
+pulse_df = 
+  haven::read_sas("./data/public_pulse_data.sas7bdat") %>%
+  janitor::clean_names()
+
+pulse_df
+```
+The BDI score is spread across 4 columns (from bdi_score_bl to bdi_score_12m),
+we want to use `pivot_longer` to bring them all to the same column.
+
+
+
+```{r}
+pulse_tidy_data = 
+  pivot_longer(
+    pulse_df, 
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit", # make a column with the initial column names
+    values_to = "bdi", # the values each column
+    names_prefix = "bdi_score_") # removes "bdi_score_" from the visit column to only see what's remaining
+
+pulse_tidy_data
+```
+
+We can also do everything in one step with the pipe.
+
+```{r, eval=F}
+pulse_df = 
+  haven::read_sas("./data/public_pulse_data.sas7bdat") %>%
+  janitor::clean_names() %>% 
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit",
+    values_to = "bdi", 
+    names_prefix = "bdi_score_") 
+
+```
+
+Let's mutate the "bl" label for visit into "00m"
+
+```{r}
+pulse_df = 
+  haven::read_sas("./data/public_pulse_data.sas7bdat") %>%
+  janitor::clean_names() %>% 
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit", 
+    values_to = "bdi", 
+    names_prefix = "bdi_score_") %>% 
+  mutate(
+    visit = replace(visit, visit == "bl", "00m"),
+                    visit = factor(visit)) %>% 
+      arrange(id, visit)
+
+pulse_df
+```
+
+## Learning assessment
+
+In the litters data, the variables gd0_weight and gd18_weight give the weight of the mother mouse on gestational days 0 and 18. Write a data cleaning chain that retains only litter_number and these columns; produces new variables gd and weight; and makes gd a numeric variable taking values 0 and 18 (for the last part, you might want to use recode …). Is this version “tidy”?
+
+```{r}
+litters_df = read_csv("./data/FAS_litters.csv") %>% 
+  janitor::clean_names() %>% 
+  select(litter_number, gd0_weight, gd18_weight) %>% # can also use ends_with("weight")
+  pivot_longer(gd0_weight:gd18_weight,
+               names_to = "gd",
+               values_to = "weight") %>% 
+  mutate(gd = recode(gd, "gd0_weight" = 0, "gd18_weight" = 18))
+
+litters_df
+```
+
+# `pivot_wider`
+
+Sometimes untidy data is easier to understand than tidy data.
+First, here is an example of tidy data:
+
+```{r}
+analysis_result = tibble(
+  group = c("treatment", "treatment", "placebo", "placebo"),
+  time = c("pre", "post", "pre", "post"),
+  mean = c(4, 8, 3.5, 4)
+)
+analysis_result
+```
+
+Let's use `pivot_wider` to make it wider:
+```{r}
+pivot_wider(
+  analysis_result, 
+  names_from = "time",  # Column names coming from the "time" variable
+  values_from = "mean") # What's in the dataframe from the "mean" variable
+```
+
+# `bind_rows`
+Let's try it with the LOTR excel sheet that has 3 tables
+
+```{r}
+fellowship_ring = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "B3:D6") %>%
+  mutate(movie = "fellowship_ring") # add a column that show
+
+two_towers = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "F3:H6") %>%
+  mutate(movie = "two_towers")
+
+return_king = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "J3:L6") %>%
+  mutate(movie = "return_king")
+```
+
+Now that we laoded our separate datasets, let's bind rows together:
+
+```{r}
+lotr_bind = 
+  bind_rows(fellowship_ring, two_towers, return_king) %>%
+  janitor::clean_names()
+```
+
+Better, but we could put the number of words for female and male columns together into one gender column:
+```{r}
+lotr_tidy = 
+  bind_rows(fellowship_ring, two_towers, return_king) %>%
+  janitor::clean_names() %>%
+  pivot_longer(
+    female:male,
+    names_to = "gender", 
+    values_to = "words")   %>% 
+  mutate(race = str_to_lower(race)) %>% # Change "Race" variable to lower case (race)
+  select(movie, everything()) # Reorganize everything (no deletion) by the movie variable
+```
+
+
+# Joining datasets
+
+First, let's load our separate datasets from pups and litters:
+```{r}
+pup_data = 
+  read_csv("./data/FAS_pups.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    sex = recode(sex, `1` = "male", `2` = "female"),
+    sex = factor(sex)) 
+
+litter_data = 
+  read_csv("./data/FAS_litters.csv") %>%
+  janitor::clean_names() %>%
+  separate(group, into = c("dose", "day_of_tx"), sep = 3) %>% 
+  # group is formatted as e.g. Con7 - separate it by 3 characters into Con and 7 in separate variables
+  relocate(litter_number) %>%
+  mutate(
+    wt_gain = gd18_weight - gd0_weight,
+    dose = str_to_lower(dose))
+```
+
+Then we use a `left_join` to include all pups and all litter within pups (pups is the "left" data set)
+```{r}
+fas_data = 
+  left_join(pup_data, litter_data, by = "litter_number")
+```
+
+`anti_join` would point out the data from the y dataset that could not be joined by the `left_join`
+
+
+
+
+
+
+
+
+
+
+
+
+
